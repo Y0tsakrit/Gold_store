@@ -3,7 +3,7 @@ export default function SignInPage() {
         <div>
             <h1>Sign in</h1>
             <form>
-                <label>
+                <label className="text-blue-200">
                     Email
                     <input type="email" />
                 </label>
