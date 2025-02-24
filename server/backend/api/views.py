@@ -1,4 +1,5 @@
 import hashlib
+import requests
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -12,6 +13,31 @@ SECRET_KEY = 'nongtonklasudnaruk'
 MONGO_URI = "mongodb+srv://67011392:ceiyingyai@cluster0.3tqmk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 client = MongoClient(MONGO_URI)
 db = client.get_database("mydb")
+
+class System():
+    def __init__(self):
+        self.__users = []
+
+    def signup(self, name, email, password, phone, address):
+        url = "http://127.0.0.1:8000/api/signup/"
+        payload = {
+            "name": name,
+            "email": email,
+            "password": password,
+            "phone": phone,
+            "address": address
+        }
+        response = requests.post(url, json=payload)
+        return response.json()
+
+    def signin(self, email, password):
+        url = "http://127.0.0.1:8000/api/signin/"
+        payload = {
+            "email": email,
+            "password": password
+        }
+        response = requests.post(url, json=payload)
+        return response.json()
 
 class Auth():
     def __init__(self, user: 'User'):
