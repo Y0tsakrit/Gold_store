@@ -10,4 +10,5 @@ urlpatterns = [
     path('register-retail/', System.RegisterRetail.as_view(), name='register_retail'),
     path('register-manufactory/', System.RegisterManufactory.as_view(), name='register_manufactory'),
     path('purchase/', System.Purchase_retails.as_view(), name='purchase'),
+    path('sell/', System.Sell.as_view(), name='sell'),
 ]

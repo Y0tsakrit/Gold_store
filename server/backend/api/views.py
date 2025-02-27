@@ -27,7 +27,7 @@ class Auth:
         if user:
             token = jwt.encode(
                 {"email": email, "exp": datetime.utcnow() + timedelta(hours=24)}, 
-                self.__SECRET_KEY, 
+                SECRET_KEY, 
                 algorithm="HS256"
             )
             response = Response({"message": "Login successful", "token": token}, status=status.HTTP_200_OK)
@@ -341,17 +341,64 @@ class System:
                         product_price = product['price']
                         product_purity = product['purity']
                         product_manufactory = product['manufactory']
+                        product__retail = product['retail']
                         user_transaction.append({
                             "type": "purchase",
                             "product_name": product_name,
                             "product_price": product_price,
                             "product_purity": product_purity,
                             "product_manufactory": product_manufactory,
-                            "quantity": quantity
+                            "quantity": quantity,
+                            "retail": product__retail
                         })
                         db.get_collection("user").update_one({"email": email}, {"$set": {"Inventory": user_inventory, "Transaction": user_transaction}})
                         db.get_collection("selling_product").insert_one({"product": product, "quantity": quantity, "retail": user})
                         return Response({"message": "Purchase successful"}, status=status.HTTP_200_OK)
+            except jwt.ExpiredSignatureError:
+                return Response({"error": "Token has expired"}, status=status.HTTP_401_UNAUTHORIZED)
+            except jwt.InvalidTokenError:
+                return Response({"error": "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
+            
+    class Sell(APIView):
+        def post(self, request):
+            token = request.COOKIES.get('jwt')
+            if not token:
+                return Response({"error": "Unauthenticated"}, status=status.HTTP_401_UNAUTHORIZED)
+            try:
+                payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+                email = payload['email']
+                user = db.get_collection("user").find_one({"email": email})
+                if user and user['type'] == 'retail':
+                    product_id = request.data.get('product_id')
+                    price = request.data.get('price')
+                    quantity = request.data.get('quantity')
+
+                    inventory = user.get('Inventory', [])
+                    product_in_inventory = None
+
+                    for item in inventory:
+                        if item['product_id'] == product_id:
+                            product_in_inventory = item
+                            break
+                    if product_in_inventory == None:
+                        return Response({"error": "Product not found in inventory"}, status=status.HTTP_404_NOT_FOUND)
+                    if product_in_inventory['quantity'] < quantity:
+                        return Response({"error": "Not enough quantity in inventory"}, status=status.HTTP_400_BAD_REQUEST)
+                    
+                    collection_sell = db.get_collection("product_sell")
+
+                    
+                    new_sale_product = {
+                        "name": product_in_inventory['name'],
+                        "price": price,
+                        "purity": product_in_inventory['purity'],
+                        "quantity": quantity,
+                        "manufactory": product_in_inventory['manufactory'],
+                        "retail": user
+                    }
+                    
+                    collection_sell.insert_one(new_sale_product)
+                    return Response({"message": "Sell successful"}, status=status.HTTP_200_OK)
             except jwt.ExpiredSignatureError:
                 return Response({"error": "Token has expired"}, status=status.HTTP_401_UNAUTHORIZED)
             except jwt.InvalidTokenError:
