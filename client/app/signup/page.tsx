@@ -148,7 +148,7 @@ export default function SignUpPage() {
 
                     <div className="flex justify-center items-center space-x-2">
                         <h2 className="text-xs">Already have an account?</h2>
-                        <Link href="/l">
+                        <Link href="/login">
                             <span className="text-xs text-blue-500 relative top-[-1px] hover:underline">
                                 Login
                             </span>
