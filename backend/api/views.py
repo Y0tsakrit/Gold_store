@@ -151,7 +151,7 @@ class Product:
     def store(self):
         collection = db.get_collection("product")
         new_product = {
-            "_id": str(self.__id),  # Convert ObjectId to string
+            "_id": ObjectId(self.__id),
             "name": self.__name,
             "price": self.__price,
             "purity": self.__purity,
@@ -163,7 +163,7 @@ class Product:
     
     @property
     def _id(self):
-        return str(self.__id)  # Convert ObjectId to string
+        return str(self.__id) 
 
 def get_token(request):
     token = None

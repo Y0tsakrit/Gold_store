@@ -23,7 +23,7 @@ export default function AddItem() {
                 body: JSON.stringify(product)
             });
             if (response.ok) {
-               
+                alert("Product added successfully");
                 console.log("Product added successfully");
             } else {
                 
