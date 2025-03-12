@@ -89,20 +89,6 @@ class Auth:
         collection.insert_one(new_user)
         return Response({"message": "User registered successfully"}, status=status.HTTP_201_CREATED)
 
-class InventoryManager:
-    def __init__(self):
-        self.__inventory = []
-
-    def add_item(self, item, quantity):
-        pass
-
-class Transaction:
-    def __init__(self):
-        self.__balance = 0
-        self.__transactions = []
-
-    def add_transaction(self, transaction):
-        pass
 
 class User:
     def __init__(self, id, name, email, password, phone, address):
@@ -112,8 +98,6 @@ class User:
         self.__password = password
         self.__phone = phone
         self.__address = address
-        self.__transaction = Transaction()
-        self.__inventory = InventoryManager()
         self.__type = "user"
 
     @property
@@ -137,14 +121,6 @@ class User:
         return self.__address
 
     @property
-    def transaction(self):
-        return self.__transaction
-
-    @property
-    def inventory(self):
-        return self.__inventory
-
-    @property
     def type(self):
         return self.__type
     @property
@@ -164,30 +140,30 @@ class Manufactory(User):
         self.__type = "manufactory"
 
 class Product:
-    def __init__(self, name, price, purity, quantity, manufactory):
+    def __init__(self, name, price, purity, quantity, manufactory_email):
         self.__id = ObjectId()
         self.__name = name
         self.__price = price
         self.__quantity = quantity
         self.__purity = purity
-        self.__manufactory = manufactory
+        self.__manufactory_email = manufactory_email
     
     def store(self):
         collection = db.get_collection("product")
         new_product = {
-            "_id": self.__id,
+            "_id": str(self.__id),  # Convert ObjectId to string
             "name": self.__name,
             "price": self.__price,
             "purity": self.__purity,
             "quantity": self.__quantity,
-            "manufactory": self.__manufactory
+            "manufactory_email": self.__manufactory_email
         }
         collection.insert_one(new_product)
         return Response({"message": "Product created successfully"}, status=status.HTTP_201_CREATED)
     
     @property
     def _id(self):
-        return self.__id
+        return str(self.__id)  # Convert ObjectId to string
 
 def get_token(request):
     token = None
@@ -249,12 +225,18 @@ class System:
 
     class ShowProduct(APIView):
         def get(self, request):
-            collection = db.get_collection("product_sell")
+            collection = db.get_collection("product")
             products = collection.find({})
             response = []
             for product in products:
-                product["_id"] = str(product["_id"])
-                response.append(product)
+                new_product = {
+                    "_id": str(product['_id']),
+                    "name": product['name'],
+                    "price": product['price'],
+                    "purity": product['purity'],
+                    "quantity": product['quantity']
+                }
+                response.append(new_product)
             return Response(response, status=status.HTTP_200_OK)
 
     class CreateProduct(APIView):
@@ -778,8 +760,15 @@ class System:
             products = collection.find({})
             response = []
             for product in products:
-                product["_id"] = str(product["_id"])
-                response.append(product)
+                new_product = {
+                    "_id": str(product['_id']),
+                    "name": product['name'],
+                    "price": product['price'],
+                    "purity": product['purity'],
+                    "quantity": product['quantity'],
+                    "retail_id": product['retail_id']
+                }
+                response.append(new_product)
             return Response(response, status=status.HTTP_200_OK)
 
     class Show_item_inventory(APIView):
@@ -794,8 +783,16 @@ class System:
                 inventory = user.get('Inventory', [])
                 response = []
                 for item in inventory:
-                    item["_id"] = str(item["_id"])
-                    response.append(item)
+                    new_item = {
+                        "product_id": str(item.get("product_id", "")),
+                        "name": item.get("name", ""),
+                        "price": item.get("price", ""),
+                        "purity": item.get("purity", ""),
+                        "quantity": item.get("quantity", ""),
+                        "manufactory_id": item.get("manufactory_id", ""),
+                        "retail_id": item.get("retail_id", "")
+                    }
+                    response.append(new_item)
                 return Response(response, status=status.HTTP_200_OK)
             except jwt.ExpiredSignatureError:
                 return Response({"error": "Token has expired"}, status=status.HTTP_401_UNAUTHORIZED)
@@ -814,20 +811,18 @@ class System:
                 transaction = user.get('Transaction', [])
                 response = []
                 for item in transaction:
-                    item["_id"] = str(item["_id"])
-                    response.append(item)
+                    new_item = {
+                        "product_id": str(item.get("product_id", "")),
+                        "type": item.get("type", ""),
+                        "name": item.get("name", ""),
+                        "price": item.get("price", ""),
+                        "purity": item.get("purity", ""),
+                        "quantity": item.get("quantity", ""),
+                        "timestamp": item.get("timestamp", "")
+                    }
+                    response.append(new_item)
                 return Response(response, status=status.HTTP_200_OK)
             except jwt.ExpiredSignatureError:
                 return Response({"error": "Token has expired"}, status=status.HTTP_401_UNAUTHORIZED)
             except jwt.InvalidTokenError:
                 return Response({"error": "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
-
-    class Show_item_product(APIView):
-        def get(self, request):
-            collection = db.get_collection("product")
-            products = collection.find({})
-            response = []
-            for product in products:
-                product["_id"] = str(product["_id"])
-                response.append(product)
-            return Response(response, status=status.HTTP_200_OK)

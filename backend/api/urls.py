@@ -10,7 +10,6 @@ urlpatterns = [
     # Product management routes
     path('products/', System.ShowProduct.as_view(), name='show_product'),
     path('create-product/', System.CreateProduct.as_view(), name='create_product'),
-    path('product-list/', System.Show_item_product.as_view(), name='show_item_product'),
     
     # User registration routes
     path('register-retail/', System.RegisterRetail.as_view(), name='register_retail'),

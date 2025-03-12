@@ -91,6 +91,9 @@ export default function Sidebar() {
                 <li className="p-4 text-center hover:bg-gray-700">
                   <Link href="/retailer">Stocking</Link>
                 </li>
+                <li className="p-4 text-center hover:bg-gray-700">
+                  <Link href="/shelf_retail">Buy stock</Link>
+                </li>
               </>
             )}
             {isManufactory && (
