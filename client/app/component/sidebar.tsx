@@ -17,10 +17,10 @@ export default function Sidebar() {
       setIsAuthenticated(true);
       try{      
       const decodedToken = JSON.parse(atob(token.split('.')[1]));
-      if (decodedToken.role === 'retailer') {
+      if (decodedToken.type === 'retail') {
         setIsRetailer(true);
       }
-      if (decodedToken.role === 'manufactory') {
+      if (decodedToken.type === 'manufactory') {
         setIsManufactory(true);
       }
     }catch(err){
@@ -61,6 +61,7 @@ export default function Sidebar() {
   };
 
   return (
+    <div className='flex flex-row'>
     <div className="h-full w-64 fixed top-0 left-0 bg-gray-900 text-white">
       <ol className="list-none p-0">
         <li className="p-4 text-center hover:bg-gray-700">
@@ -83,13 +84,10 @@ export default function Sidebar() {
             <li className="p-4 text-center hover:bg-gray-700">
               <Link href="/profile">Profile</Link>
             </li>
-            <li className="p-4 text-center hover:bg-gray-700">
-              <Link href="/settings">Settings</Link>
-            </li>
             {isRetailer && (
               <>
                 <li className="p-4 text-center hover:bg-gray-700">
-                  <Link href="/retailer">Stocking</Link>
+                  <Link href="sell_item">Selling</Link>
                 </li>
                 <li className="p-4 text-center hover:bg-gray-700">
                   <Link href="/shelf_retail">Buy stock</Link>
@@ -114,6 +112,7 @@ export default function Sidebar() {
           </>
         )}
       </ol>
+    </div>
     </div>
   );
 }

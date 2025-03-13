@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
+import Sidebar from '../component/sidebar';
 
 
 interface Product {
@@ -70,10 +71,10 @@ const ProductPage: React.FC = () => {
     try {
       setMessage(null); 
       
-      const response = await fetch('http://127.0.0.1:8000/purchase-retail/', {
+      const response = await fetch('http://127.0.0.1:8000/api/purchase-retail/', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('jwt')}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -100,14 +101,11 @@ const ProductPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <Head>
-        <title>Products - Buy Gold</title>
-        <meta name="description" content="Purchase gold products" />
-      </Head>
-
-      <h1 className="text-3xl font-bold mb-8">Manufactory Shelf</h1>
-      
+    <div className="flex">
+      <div className="fixed h-full">
+        <Sidebar />
+      </div>
+      <div className="ml-64 p-8 w-full">
       {message && (
         <div className={`p-4 mb-6 rounded-md ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
           {message.text}
@@ -132,7 +130,7 @@ const ProductPage: React.FC = () => {
                       <span className="font-medium">Purity:</span> {product.purity}
                     </p>
                     <p className="text-gray-600">
-                      <span className="font-medium">Price:</span> ${product.price.toFixed(2)}
+                      <span className="font-medium">Price:</span> ${product.price}
                     </p>
                     <p className="text-gray-600">
                       <span className="font-medium">Available:</span> {product.quantity} units
@@ -176,6 +174,7 @@ const ProductPage: React.FC = () => {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 };

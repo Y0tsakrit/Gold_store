@@ -26,4 +26,8 @@ urlpatterns = [
     path('inventory/', System.Show_item_inventory.as_view(), name='show_inventory'),
     path('transactions/', System.Show_item_transaction.as_view(), name='show_transactions'),
     path('retail-products/', System.Show_item_sell.as_view(), name='show_item_sell'),
+
+
+    path('profile/', System.show_name.as_view(), name='profile'),
+    path('user-profile/', System.UserProfile.as_view(), name='update_profile'),
 ]
