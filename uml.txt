@@ -1,0 +1,193 @@
+@startuml
+actor User
+participant "API" as API
+participant "JWT" as JWT
+participant "Database" as DB
+participant "Product" as Product
+
+== Signin ==
+User -> API: POST /signin
+API -> Auth: signin(email, password)
+Auth -> DB: find_one({"email": email, "password": password_hash})
+alt user found
+    Auth -> JWT: encode(payload, SECRET_KEY)
+    Auth -> User: Response({"message": "Login successful", "token": token}, status=200)
+else user not found
+    Auth -> User: Response({"error": "Invalid credentials"}, status=401)
+end
+
+== Signup ==
+User -> API: POST /signup
+API -> Auth: signup(payload)
+Auth -> DB: find_one({"email": email})
+alt user exists
+    Auth -> User: Response({"error": "Email already exists"}, status=400)
+else user does not exist
+    Auth -> DB: insert_one(new_user)
+    Auth -> User: Response({"message": "User registered successfully"}, status=201)
+end
+
+== CreateProduct ==
+User -> API: POST /create_product
+API -> API: get_token(request)
+API -> JWT: decode(token, SECRET_KEY)
+alt valid token
+    API -> DB: find_one({"email": email})
+    alt user is manufactory
+        API -> API: get product details from request
+        API -> Product: create product
+        Product -> Product: store()
+        Product -> DB: insert_one(new_product)
+        API -> DB: update_one({"email": email}, {"$set": {"Inventory": user_inventory}})
+        API -> DB: update_one({"email": email}, {"$set": {"Transaction": user_transaction}})
+        API -> User: Response({"message": "Product created successfully"}, status=201)
+    else invalid user
+        API -> User: Response({"error": "Invalid user"}, status=401)
+    end
+else invalid token
+    API -> User: Response({"error": "Invalid token"}, status=401)
+end
+
+== Purchase_retails ==
+User -> API: POST /purchase_retails
+API -> API: get_token(request)
+API -> JWT: decode(token, SECRET_KEY)
+alt valid token
+    API -> DB: find_one({"email": email})
+    alt user is retail
+        API -> API: get product_id and quantity from request
+        API -> DB: find_one({"_id": ObjectId(product_id)})
+        alt product found
+            API -> API: check balance and quantity
+            alt sufficient balance and quantity
+                API -> DB: update_one({"_id": ObjectId(product_id)}, {"$inc": {"quantity": -quantity}})
+                API -> DB: update manufactory and user inventory and transactions
+                API -> DB: update_one({"email": manufactory_email}, {"$set": {"balance": new_balance}})
+                API -> DB: update_one({"email": email}, {"$set": {"balance": new_balance}})
+                API -> User: Response({"message": "Purchase successful"}, status=200)
+            else insufficient balance or quantity
+                API -> User: Response({"error": "Not enough balance or quantity"}, status=400)
+            end
+        else product not found
+            API -> User: Response({"error": "Product not found"}, status=404)
+        end
+    else invalid user type
+        API -> User: Response({"error": "Invalid user type"}, status=401)
+    end
+else invalid token
+    API -> User: Response({"error": "Invalid token"}, status=401)
+end
+
+== Purchase_customer ==
+User -> API: POST /purchase_customer
+API -> API: get_token(request)
+API -> JWT: decode(token, SECRET_KEY)
+alt valid token
+    API -> DB: find_one({"email": email})
+    API -> API: get product_id and quantity from request
+    API -> DB: find_one({"_id": ObjectId(product_id)})
+    alt product found
+        API -> API: check balance and quantity
+        alt sufficient balance and quantity
+            API -> DB: update_one({"_id": ObjectId(product_id)}, {"$inc": {"quantity": -quantity}})
+            API -> DB: update retail and user inventory and transactions
+            API -> DB: update_one({"email": Retail_email}, {"$set": {"balance": new_balance}})
+            API -> DB: update_one({"email": email}, {"$set": {"balance": new_balance}})
+            API -> User: Response({"message": "Purchase successful"}, status=200)
+        else insufficient balance or quantity
+            API -> User: Response({"error": "Not enough balance or quantity"}, status=400)
+        end
+    else product not found
+        API -> User: Response({"error": "Product not found"}, status=404)
+    end
+else invalid token
+    API -> User: Response({"error": "Invalid token"}, status=401)
+end
+
+== Sell ==
+User -> API: POST /sell
+API -> API: get_token(request)
+API -> JWT: decode(token, SECRET_KEY)
+alt valid token
+    API -> DB: find_one({"email": email})
+    alt user is retail
+        API -> API: get product_id, price, and quantity from request
+        API -> API: check inventory
+        alt product found in inventory
+            API -> DB: update inventory
+            API -> DB: insert_one(new_sale_product)
+            API -> DB: update_one({"email": email}, {"$set": {"Inventory": new_inventory}})
+            API -> DB: update_one({"email": email}, {"$push": {"Transaction": transaction}})
+            API -> User: Response({"message": "Product listed for sale successfully"}, status=201)
+        else product not found in inventory
+            API -> User: Response({"error": "Product not found in inventory"}, status=404)
+        end
+    else invalid user type
+        API -> User: Response({"error": "Only retail users can sell products"}, status=401)
+    end
+else invalid token
+    API -> User: Response({"error": "Invalid token"}, status=401)
+end
+
+== Show_list_manufactory ==
+User -> API: GET /show_list_manufactory
+API -> DB: find({"type": "manufactory"})
+API -> User: Response(manufactory_list, status=200)
+
+== Show_item_sell ==
+User -> API: GET /show_item_sell
+API -> DB: find({})
+API -> User: Response(product_list, status=200)
+
+== Show_item_inventory ==
+User -> API: GET /show_item_inventory
+API -> API: get_token(request)
+API -> JWT: decode(token, SECRET_KEY)
+alt valid token
+    API -> DB: find_one({"email": email})
+    API -> DB: find_one({"_id": ObjectId(manufactory_id)})
+    API -> User: Response(inventory_list, status=200)
+else invalid token
+    API -> User: Response({"error": "Invalid token"}, status=401)
+end
+
+== Show_item_transaction ==
+User -> API: GET /show_item_transaction
+API -> API: get_token(request)
+API -> JWT: decode(token, SECRET_KEY)
+alt valid token
+    API -> DB: find_one({"email": email})
+    API -> User: Response(transaction_list, status=200)
+else invalid token
+    API -> User: Response({"error": "Invalid token"}, status=401)
+end
+
+== show_name ==
+User -> API: POST /show_name
+API -> API: get id from request
+alt id provided
+    API -> DB: find_one({"_id": ObjectId(id)}, {"name": 1, "_id": 0})
+    alt user found
+        API -> User: Response(user, status=200)
+    else user not found
+        API -> User: Response({"error": "User not found"}, status=404)
+    end
+else id not provided
+    API -> User: Response({"error": "ID is required"}, status=400)
+end
+
+== UserProfile ==
+User -> API: GET /user_profile
+API -> API: get_token(request)
+API -> JWT: decode(token, SECRET_KEY)
+alt valid token
+    API -> DB: find_one({"email": email}, {"_id": 0, "password": 0})
+    alt user found
+        API -> User: Response(user_profile, status=200)
+    else user not found
+        API -> User: Response({"error": "User not found"}, status=404)
+    end
+else invalid token
+    API -> User: Response({"error": "Invalid token"}, status=401)
+end
+@enduml
