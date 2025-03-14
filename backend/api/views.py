@@ -329,7 +329,10 @@ class System:
                     return Response({"error": "Invalid user type"}, status=status.HTTP_401_UNAUTHORIZED)
                     
                 product_id = request.data.get('product_id')
-                quantity = int(request.data.get('quantity'))
+                quantity = int(request.data.get('quantity', 0))
+                
+                if quantity <= 0:
+                    return Response({"error": "Invalid quantity"}, status=status.HTTP_400_BAD_REQUEST)
                 
                 collection = db.get_collection("product")
                 product = collection.find_one({"_id": ObjectId(product_id)})
@@ -337,13 +340,14 @@ class System:
                 if not product:
                     return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
                 
-                if int(user['balance']) < int(product['price']):
+             
+                total_price = int(product['price']) * quantity
+                
+                if int(user['balance']) < total_price:
                     return Response({"error": "Not enough balance"}, status=status.HTTP_400_BAD_REQUEST)
                     
                 if int(product['quantity']) < quantity:
                     return Response({"error": "Not enough product quantity available"}, status=status.HTTP_400_BAD_REQUEST)
-
-
 
                 manufactory = product['manufactory']
                 manufactory_email = manufactory['email']
@@ -352,10 +356,10 @@ class System:
                 if not manufactory_user:
                     return Response({"error": "Manufactory not found"}, status=status.HTTP_404_NOT_FOUND)
                 
-            
+        
                 collection.update_one({"_id": ObjectId(product_id)}, {"$inc": {"quantity": -quantity}})
                 
-                
+              
                 manufactory_inventory = manufactory_user['Inventory']
                 new_manufactory_inventory = []
                 manufactory_product_found = False
@@ -379,23 +383,25 @@ class System:
                 if not manufactory_product_found:
                     return Response({"error": "Product not found in manufactory inventory"}, status=status.HTTP_404_NOT_FOUND)
                 
-                
-                user_inventory = user['Inventory']
+               
+                user_inventory = user.get('Inventory', [])
                 new_user_inventory = []
                 user_product_found = False
                 
                 for item in user_inventory:
-                    if str(item['product_id']) == str(product_id):
+                    if 'product_id' in item and str(item['product_id']) == str(product_id):
                         user_product_found = True
                         new_user_inventory.append({
                             "product_id": ObjectId(product_id),
                             "name": product['name'],
-                            "quantity": item['quantity'] + quantity,
-                            "still": item['quantity'] + quantity,
+                            "quantity": int(item['quantity']) + quantity,
+                            "still": int(item['still']) + quantity,
                             "price": product['price'],
                             "purity": product['purity'],
                             "manufactory_id": manufactory['_id']  
                         })
+                    else:
+                        new_user_inventory.append(item)
                 
                 if not user_product_found:
                     new_user_inventory.append({
@@ -408,8 +414,12 @@ class System:
                         "manufactory_id": manufactory['_id']  
                     })
                 
-                
-                manufactory_transaction = manufactory_user['Transaction']
+        
+                if 'Transaction' in manufactory_user:
+                    manufactory_transaction = manufactory_user['Transaction']
+                else:
+                    manufactory_transaction = []
+                    
                 manufactory_transaction.append({
                     "product_id": ObjectId(product_id),
                     "type": "sell",
@@ -421,7 +431,11 @@ class System:
                     "timestamp": datetime.now()
                 })
                 
-                user_transaction = user['Transaction']
+                if 'Transaction' in user:
+                    user_transaction = user['Transaction']
+                else:
+                    user_transaction = []
+                    
                 user_transaction.append({
                     "product_id": ObjectId(product_id),
                     "type": "buy",
@@ -434,29 +448,27 @@ class System:
                 })
                 
                 
-                total_price = int(product['price'])
-                
-                
                 db.get_collection("user").update_one(
                     {"email": manufactory_email}, 
                     {"$set": {
-                        "balance": manufactory_user['balance'] + total_price,
+                        "balance": int(manufactory_user['balance']) + total_price,
                         "Inventory": new_manufactory_inventory,
                         "Transaction": manufactory_transaction
                     }}
                 )
                 
+         
                 db.get_collection("user").update_one(
                     {"email": email}, 
                     {"$set": {
-                        "balance": user['balance'] - total_price,
+                        "balance": int(user['balance']) - total_price,
                         "Inventory": new_user_inventory,
                         "Transaction": user_transaction
                     }}
                 )
                 
-                
-                if int(product['quantity']) - int(quantity) <= 0:
+               
+                if int(product['quantity']) - quantity <= 0:
                     db.get_collection("product").delete_one({"_id": ObjectId(product_id)})
                     return Response({"message": "Purchase successful, and it sold out!!!"}, status=status.HTTP_200_OK)
                 
@@ -467,10 +479,9 @@ class System:
             except jwt.InvalidTokenError:
                 return Response({"error": "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
             except Exception as e:
-                
                 print(f"Error in purchase: {str(e)}")
-                return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
+                return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)    
+    
     class Purchase_customer(APIView):
         def post(self, request):
             token = get_token(request)
@@ -480,138 +491,180 @@ class System:
                 payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"], options={"verify_exp": False})
                 email = payload['email']
                 user = db.get_collection("user").find_one({"email": email})
+                
+                if not user:
+                    return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
                     
                 product_id = request.data.get('product_id')
-                quantity = int(request.data.get('quantity'))
+                if not product_id:
+                    return Response({"error": "Product ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+                    
+                try:
+                    quantity = int(request.data.get('quantity', 0))
+                except (ValueError, TypeError):
+                    return Response({"error": "Quantity must be a valid number"}, status=status.HTTP_400_BAD_REQUEST)
+                    
+                if quantity <= 0:
+                    return Response({"error": "Quantity must be greater than zero"}, status=status.HTTP_400_BAD_REQUEST)
                 
+            
                 collection = db.get_collection("product_sell")
                 product = collection.find_one({"_id": ObjectId(product_id)})
                 
                 if not product:
                     return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
                     
-                if int(user['balance']) < product['price'] * quantity:
+             
+                price_per_unit = float(product['price'])
+                total_price = price_per_unit * quantity
+                
+               
+                if int(user['balance']) < total_price:
                     return Response({"error": "Not enough balance"}, status=status.HTTP_400_BAD_REQUEST)
                     
+              
                 if int(product['quantity']) < quantity:
                     return Response({"error": "Not enough product quantity available"}, status=status.HTTP_400_BAD_REQUEST)
                 
-                Retail = product['retail_id']
-                Retail_user = db.get_collection("user").find_one({"_id": ObjectId(Retail)})
-                Retail_email = Retail_user['email']
+                retail_id = product['retail_id']
+                retail_user = db.get_collection("user").find_one({"_id": ObjectId(retail_id)})
                 
-                if not Retail_user:
-                    return Response({"error": "Retail not found"}, status=status.HTTP_404_NOT_FOUND)
+                if not retail_user:
+                    return Response({"error": "Retail user not found"}, status=status.HTTP_404_NOT_FOUND)
+                    
+                retail_email = retail_user['email']
                 
-             
+            
                 collection.update_one({"_id": ObjectId(product_id)}, {"$inc": {"quantity": -quantity}})
                 
-             
-                Retail_inventory = Retail_user['Inventory']
-                new_Retail_inventory = []
-                Retail_product_found = False
+          
+                retail_inventory = retail_user.get('Inventory', [])
+                new_retail_inventory = []
+                retail_product_found = False
                 
-                for item in Retail_inventory:
+                for item in retail_inventory:
+                    if not isinstance(item, dict) or 'product_id' not in item:
+                        new_retail_inventory.append(item)
+                        continue
+                        
                     if str(item['product_id']) == str(product_id):
-                        Retail_product_found = True
-                        new_quantity = item['quantity'] - quantity
+                        retail_product_found = True
+                        new_quantity = int(item.get('quantity', 0)) - quantity
                         if new_quantity > 0:
-                            new_Retail_inventory.append({
-                                "product_id": ObjectId(product_id),
-                                "name": product['name'],
-                                "quantity": new_quantity,
-                                "price": product['price'],
-                                "purity": product['purity'],
-                                "manufactory_id": product.get('manufactory_id') or product.get('manufactory', {}).get('_id')
-                            })
+                            new_item = item.copy()
+                            new_item['quantity'] = new_quantity
+                            new_retail_inventory.append(new_item)
                     else:
-                        new_Retail_inventory.append(item)
+                        new_retail_inventory.append(item)
                 
-                if not Retail_product_found:
-                    return Response({"error": "Product not found in Retail inventory"}, status=status.HTTP_404_NOT_FOUND)
+                if not retail_product_found:
+                    return Response({"error": "Product not found in retail inventory"}, status=status.HTTP_404_NOT_FOUND)
                 
-              
-                user_inventory = user['Inventory']
+               
+                user_inventory = user.get('Inventory', [])
                 new_user_inventory = []
                 user_product_found = False
                 
                 for item in user_inventory:
+                    if not isinstance(item, dict) or 'product_id' not in item:
+                        new_user_inventory.append(item)
+                        continue
+                        
                     if str(item['product_id']) == str(product_id):
                         user_product_found = True
-                        new_user_inventory.append({
-                            "product_id": ObjectId(product_id),
-                            "name": product['name'],
-                            "quantity": item['quantity'] + quantity,
-                            "price": product['price'],
-                            "purity": product['purity'],
-                            "retail_id": Retail  
-                        })
+                        new_item = item.copy()
+                        new_item['quantity'] = int(item.get('quantity', 0)) + quantity
+                        new_user_inventory.append(new_item)
                     else:
                         new_user_inventory.append(item)
                 
                 if not user_product_found:
+                   
+                    manufactory_id = product.get('manufactory_id')
+                    if not manufactory_id and 'manufactory' in product and isinstance(product['manufactory'], dict):
+                        manufactory_id = product['manufactory'].get('_id')
+                        
                     new_user_inventory.append({
                         "product_id": ObjectId(product_id),
                         "name": product['name'],
                         "quantity": quantity,
-                        "price": product['price'],
+                        "price": price_per_unit,
                         "purity": product['purity'],
-                        "retail_id": Retail  
+                        "retail_id": retail_id,
+                        "manufactory_id": manufactory_id
                     })
                 
+            
+                timestamp = datetime.now()
                 
-                Retail_transaction = Retail_user['Transaction']
-                Retail_transaction.append({
+               
+                retail_transaction = {
                     "product_id": ObjectId(product_id),
                     "type": "sell",
                     "name": product['name'],
-                    "price": product['price'],
+                    "price": price_per_unit,
                     "purity": product['purity'],
                     "quantity": quantity,
                     "buyer_email": email,
-                    "timestamp": datetime.now()
-                })
+                    "timestamp": timestamp
+                }
                 
-               
-                user_transaction = user['Transaction']
-                user_transaction.append({
+             
+                user_transaction = {
                     "product_id": ObjectId(product_id),
                     "type": "buy",
                     "name": product['name'],
-                    "price": product['price'],
+                    "price": price_per_unit,
                     "purity": product['purity'],
                     "quantity": quantity,
-                    "seller_email": Retail_email,
-                    "timestamp": datetime.now()
-                })
-                
-            
-                total_price = product['price'] * quantity
-                
-             
-                db.get_collection("user").update_one(
-                    {"email": Retail_email}, 
-                    {"$set": {
-                        "balance": Retail_user['balance'] + total_price,
-                        "Inventory": new_Retail_inventory,
-                        "Transaction": Retail_transaction
-                    }}
-                )
+                    "seller_email": retail_email,
+                    "timestamp": timestamp
+                }
                 
                 
-                db.get_collection("user").update_one(
-                    {"email": email}, 
-                    {"$set": {
-                        "balance": user['balance'] - total_price,
-                        "Inventory": new_user_inventory,
-                        "Transaction": user_transaction
-                    }}
-                )
+                if 'Transaction' in retail_user:
+                    db.get_collection("user").update_one(
+                        {"email": retail_email}, 
+                        {"$set": {
+                            "balance": float(retail_user['balance']) + total_price,
+                            "Inventory": new_retail_inventory
+                        },
+                        "$push": {"Transaction": retail_transaction}}
+                    )
+                else:
+                    db.get_collection("user").update_one(
+                        {"email": retail_email}, 
+                        {"$set": {
+                            "balance": float(retail_user['balance']) + total_price,
+                            "Inventory": new_retail_inventory,
+                            "Transaction": [retail_transaction]
+                        }}
+                    )
+                
+              
+                if 'Transaction' in user:
+                    db.get_collection("user").update_one(
+                        {"email": email}, 
+                        {"$set": {
+                            "balance": float(user['balance']) - total_price,
+                            "Inventory": new_user_inventory
+                        },
+                        "$push": {"Transaction": user_transaction}}
+                    )
+                else:
+                    db.get_collection("user").update_one(
+                        {"email": email}, 
+                        {"$set": {
+                            "balance": float(user['balance']) - total_price,
+                            "Inventory": new_user_inventory,
+                            "Transaction": [user_transaction]
+                        }}
+                    )
                 
                 
-                if product['quantity'] - quantity <= 0:
+                if int(product['quantity']) - quantity <= 0:
                     db.get_collection("product_sell").delete_one({"_id": ObjectId(product_id)})
-                    return Response({"message": "Purchase successful, and it sold out!!!"}, status=status.HTTP_200_OK)
+                    return Response({"message": "Purchase successful, and it sold out!"}, status=status.HTTP_200_OK)
                 
                 return Response({"message": "Purchase successful"}, status=status.HTTP_200_OK)
                 
@@ -622,7 +675,7 @@ class System:
             except Exception as e:
                 print(f"Error in purchase: {str(e)}")
                 return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
+                
     class Sell(APIView):
         def post(self, request):
             token = get_token(request)
@@ -635,85 +688,74 @@ class System:
                 
                 if not (user and user['type'] == 'retail'):
                     return Response({"error": "Only retail users can sell products"}, status=status.HTTP_401_UNAUTHORIZED)
-                
+                    
                 product_id = request.data.get('product_id')
-                price = float(request.data.get('price'))
-                quantity = int(request.data.get('quantity'))
-
+                price = float(request.data.get('price', 0))
+                quantity = int(request.data.get('quantity', 0))
+                
+                if price <= 0 or quantity <= 0:
+                    return Response({"error": "Invalid price or quantity"}, status=status.HTTP_400_BAD_REQUEST)
+                
                 inventory = user.get('Inventory', [])
                 product_found = False
                 product_in_inventory = None
                 new_inventory = []
                 
+        
                 for item in inventory:
                     if str(item['product_id']) == str(product_id):
                         product_found = True
                         product_in_inventory = item
                         
-                        if item['still'] < quantity:
+                        if item.get('still', 0) < quantity:
                             return Response({"error": "Not enough quantity in inventory"}, 
                                             status=status.HTTP_400_BAD_REQUEST)
                         
-                        updated_quantity = item['quantity'] - quantity
-                        if updated_quantity > 0:
-                            new_inventory.append({
-                                "product_id": item['product_id'],
-                                "name": item['name'],
-                                "quantity": item['quantity'],
-                                "still": item['still'] - quantity,
-                                "price": item['price'],
-                                "purity": item['purity'],
-                                "manufactory_id": item.get('manufactory_id') or item.get('manufactory', {}).get('_id')
-                            })
+                        new_inventory.append({
+                            "product_id": item['product_id'],
+                            "name": item['name'],
+                            "quantity": item['quantity'],
+                            "still": item['still'] - quantity,
+                            "price": item['price'],
+                            "purity": item['purity'],
+                            "manufactory_id": item.get('manufactory_id') or 
+                                                (item.get('manufactory', {}).get('_id') if isinstance(item.get('manufactory'), dict) else None)
+                        })
                     else:
                         new_inventory.append(item)
-                        
+                
                 if not product_found:
                     return Response({"error": "Product not found in inventory"}, 
-                                status=status.HTTP_404_NOT_FOUND)
+                                    status=status.HTTP_404_NOT_FOUND)
                 
-                collection_sell = db.get_collection("product_sell")
-                db.get_collection("user").update_one({"email": email}, {"$set": {"Inventory": new_inventory}})
+             
                 manufactory_id = product_in_inventory.get('manufactory_id')
                 if not manufactory_id and 'manufactory' in product_in_inventory:
                     if isinstance(product_in_inventory['manufactory'], dict):
                         manufactory_id = product_in_inventory['manufactory'].get('_id')
-                match = False
-                user_inventory = user['Inventory']
-                for item in user['Inventory']:
-                    if str(item['product_id']) == str(product_id):
-                        user_inventory.remove(item)
-                        db.get_collection("product_sell").delete_one({"_id": ObjectId(product_id)})
-                        new_sale_product = {
-                        "_id": ObjectId(item['product_id']),
-                        "name": product_in_inventory['name'],
-                        "price": price,
-                        "purity": product_in_inventory['purity'],
-                        "quantity": quantity + item['quantity'],
-                        "manufactory_id": manufactory_id,
-                        "retail_id": user['_id']}
-                        user_inventory.append(new_sale_product)
-                        match = True
-
-                if not match:
-                    new_sale_product = {
-                        "_id": ObjectId(item['product_id']),
-                        "name": product_in_inventory['name'],
-                        "price": price,
-                        "purity": product_in_inventory['purity'],
-                        "quantity": quantity,
-                        "manufactory_id": manufactory_id,
-                        "retail_id": user['_id']
-                    }
-                    user_inventory.append(new_sale_product)
                 
+              
+                new_sale_product = {
+                    "_id": ObjectId(product_in_inventory['product_id']),
+                    "name": product_in_inventory['name'],
+                    "price": price,
+                    "purity": product_in_inventory['purity'],
+                    "quantity": quantity,
+                    "manufactory_id": manufactory_id,
+                    "retail_id": user['_id']
+                }
+                
+            
+                collection_sell = db.get_collection("product_sell")
                 result = collection_sell.insert_one(new_sale_product)
                 
+            
                 db.get_collection("user").update_one(
                     {"email": email},
                     {"$set": {"Inventory": new_inventory}}
                 )
                 
+              
                 transaction = {
                     "product_id": result.inserted_id,
                     "type": "list_for_sale",
@@ -724,6 +766,7 @@ class System:
                     "timestamp": datetime.now()
                 }
                 
+              
                 db.get_collection("user").update_one(
                     {"email": email},
                     {"$push": {"Transaction": transaction}}
@@ -741,9 +784,8 @@ class System:
             except Exception as e:
                 print(f"Error in sell: {str(e)}")
                 return Response({"error": f"An unexpected error occurred: {str(e)}"}, 
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
     class Show_list_manufactory(APIView):
         def get(self, request):
             collection = db.get_collection("user")
