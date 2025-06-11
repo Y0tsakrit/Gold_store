@@ -46,7 +46,7 @@ export default function SignUpPage() {
             }
 
             alert("Signup successful! Please log in.");
-            router.push("/signin");
+            router.push("/login");
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -55,12 +55,12 @@ export default function SignUpPage() {
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-100">
-            <div className="bg-white p-8 rounded-lg shadow-lg mt-4 mb-4 w-full max-w-md">
-                <h1 className="text-2xl font-bold text-center mb-6">Sign Up</h1>
+        <div className="flex justify-center items-center bg-gray-100 min-h-screen">
+            <div className="bg-white shadow-lg mt-4 mb-4 p-8 rounded-lg w-full max-w-md">
+                <h1 className="mb-6 font-bold text-2xl text-center">Sign Up</h1>
                 
                 {error && (
-                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                    <div className="bg-red-100 mb-4 px-4 py-3 border border-red-400 rounded text-red-700">
                         {error}
                     </div>
                 )}
@@ -73,7 +73,7 @@ export default function SignUpPage() {
                             name="name"
                             value={formData.name}
                             onChange={handleChange}
-                            className="border rounded p-2 mt-1" 
+                            className="mt-1 p-2 border rounded" 
                             placeholder="Gold Store" 
                             required
                         />
@@ -85,7 +85,7 @@ export default function SignUpPage() {
                             name="email"
                             value={formData.email}
                             onChange={handleChange}
-                            className="border rounded p-2 mt-1" 
+                            className="mt-1 p-2 border rounded" 
                             placeholder="CEI@kmitl.ac.th" 
                             required
                         />
@@ -97,7 +97,7 @@ export default function SignUpPage() {
                             name="password"
                             value={formData.password}
                             onChange={handleChange}
-                            className="border rounded p-2 mt-1" 
+                            className="mt-1 p-2 border rounded" 
                             placeholder="********" 
                             required
                         />
@@ -109,7 +109,7 @@ export default function SignUpPage() {
                             name="phone"
                             value={formData.phone}
                             onChange={handleChange}
-                            className="border rounded p-2 mt-1" 
+                            className="mt-1 p-2 border rounded" 
                             placeholder="+66 XX XXX XXXX" 
                             required
                         />
@@ -121,7 +121,7 @@ export default function SignUpPage() {
                             name="address"
                             value={formData.address}
                             onChange={handleChange}
-                            className="border rounded p-2 mt-1" 
+                            className="mt-1 p-2 border rounded" 
                             placeholder="123 Main St, City, Country" 
                             required
                         />
@@ -133,7 +133,7 @@ export default function SignUpPage() {
                             name="id"
                             value={formData.id}
                             onChange={handleChange}
-                            className="border rounded p-2 mt-1" 
+                            className="mt-1 p-2 border rounded" 
                             placeholder="1234567890" 
                             required
                         />
@@ -149,7 +149,7 @@ export default function SignUpPage() {
                     <div className="flex justify-center items-center space-x-2">
                         <h2 className="text-xs">Already have an account?</h2>
                         <Link href="/login">
-                            <span className="text-xs text-blue-500 relative top-[-1px] hover:underline">
+                            <span className="top-[-1px] relative text-blue-500 text-xs hover:underline">
                                 Login
                             </span>
                         </Link>

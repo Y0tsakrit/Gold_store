@@ -8,11 +8,15 @@ from pathlib import Path
 from bson import ObjectId
 import jwt
 from datetime import datetime, timedelta
+import os
+from dotenv import load_dotenv
 
+
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-SECRET_KEY = 'nongtonklasudnaruk'
-MONGO_URI = "mongodb+srv://67011392:ceiyingyai@cluster0.3tqmk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+SECRET_KEY = os.getenv('SECRET_KEY', 'fallback-secret-key')
+MONGO_URI = os.getenv('MONGO_URI')
 client = MongoClient(MONGO_URI)
 db = client.get_database("mydb")
 
